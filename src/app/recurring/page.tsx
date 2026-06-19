@@ -40,10 +40,12 @@ export default async function TemplatesPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("site_id")
+    .select("site_id, role")
     .eq("id", user.id)
     .single();
   if (!profile?.site_id) redirect("/tasks");
+  if (!["admin", "manager", "maintenance"].includes(profile.role ?? ""))
+    redirect("/tasks");
 
   const { data: templates } = await supabase
     .from("task_templates")

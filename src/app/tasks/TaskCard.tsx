@@ -1,5 +1,4 @@
-import { startTask, reopenTask } from "./actions";
-import CompleteControl from "./CompleteControl";
+import TaskActions from "./TaskActions";
 import { formatDue, isOverdue } from "@/lib/dates";
 
 type Task = {
@@ -13,6 +12,9 @@ type Task = {
   due_date: string | null;
   reported_by_name: string | null;
   requires_photo: boolean;
+  completion_note?: string | null;
+  verified_at?: string | null;
+  report_photo_path?: string | null;
 };
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -41,9 +43,11 @@ function railColor(task: Task): string {
 export default function TaskCard({
   task,
   proofUrl,
+  reportPhotoUrl,
 }: {
   task: Task;
   proofUrl?: string;
+  reportPhotoUrl?: string;
 }) {
   const done = task.status === "completed";
   const overdue = !done && isOverdue(task.due_date);
@@ -75,6 +79,21 @@ export default function TaskCard({
                 from {task.reported_by_name}
               </p>
             )}
+            {!done && reportPhotoUrl && (
+              <a
+                href={reportPhotoUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-block"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={reportPhotoUrl}
+                  alt="Reported issue"
+                  className="h-16 w-16 rounded-lg border border-line object-cover"
+                />
+              </a>
+            )}
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
             <span
@@ -88,30 +107,40 @@ export default function TaskCard({
             >
               {done ? "Done" : formatDue(task.due_date)}
             </span>
+            {done && task.verified_at && (
+              <span className="rounded-md bg-done/10 px-2 py-0.5 text-xs font-medium text-done">
+                ✓ Verified
+              </span>
+            )}
             {!done && task.requires_photo && (
               <span className="text-xs text-neutral">photo needed</span>
             )}
           </div>
         </div>
 
-        {done && proofUrl && (
-          <a
-            href={proofUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-2 block"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={proofUrl}
-              alt="Completion proof"
-              className="h-20 w-20 rounded-lg border border-line object-cover"
-            />
-          </a>
+        {done && (proofUrl || task.completion_note) && (
+          <div className="mt-2 flex items-start gap-3">
+            {proofUrl && (
+              <a href={proofUrl} target="_blank" rel="noreferrer" className="shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={proofUrl}
+                  alt="Completion proof"
+                  className="h-20 w-20 rounded-lg border border-line object-cover"
+                />
+              </a>
+            )}
+            {task.completion_note && (
+              <p className="text-sm text-neutral">
+                <span className="font-medium text-ink">Note: </span>
+                {task.completion_note}
+              </p>
+            )}
+          </div>
         )}
 
         <div className="mt-2.5 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 text-xs text-neutral">
+          <div className="flex shrink-0 items-center gap-1.5 text-xs text-neutral">
             {task.category && CATEGORY_LABEL[task.category] && (
               <span className="rounded bg-paper px-1.5 py-0.5">
                 {CATEGORY_LABEL[task.category]}
@@ -121,32 +150,14 @@ export default function TaskCard({
               {SOURCE_LABEL[task.source] ?? task.source}
             </span>
           </div>
+        </div>
 
-          <div className="flex items-center gap-1.5">
-            {done ? (
-              <form action={reopenTask}>
-                <input type="hidden" name="id" value={task.id} />
-                <button className="rounded-lg border border-line px-3 py-1.5 text-sm text-neutral">
-                  Reopen
-                </button>
-              </form>
-            ) : (
-              <>
-                {task.status === "open" && (
-                  <form action={startTask}>
-                    <input type="hidden" name="id" value={task.id} />
-                    <button className="rounded-lg border border-line px-3 py-1.5 text-sm">
-                      Start
-                    </button>
-                  </form>
-                )}
-                <CompleteControl
-                  taskId={task.id}
-                  requiresPhoto={task.requires_photo}
-                />
-              </>
-            )}
-          </div>
+        <div className="mt-2">
+          <TaskActions
+            taskId={task.id}
+            status={task.status}
+            requiresPhoto={task.requires_photo}
+          />
         </div>
       </div>
     </div>

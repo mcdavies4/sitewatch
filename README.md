@@ -8,6 +8,8 @@ One task inbox, four views (Today / Overdue / All open / Done), manual add, one-
 
 At [supabase.com](https://supabase.com), create a project. Then in **SQL Editor**, paste and run the whole of `supabase/migrations/0001_init.sql`. That builds every table, the row-level-security policies, the signup trigger, and the `task-proofs` storage bucket for photo proof — all in one run.
 
+> **Already running an earlier version?** Run any migration files you haven't yet — `0002` through `0006` — once each, in order. `0004` adds invites/roles, `0005` the report photo, `0006` the contractor fields. The rest is in the app code.
+
 In **Authentication → Providers → Email**, make sure Email is enabled (magic links are on by default).
 
 ## 2. Add your keys
@@ -50,7 +52,7 @@ supabase/migrations    full schema, RLS, trigger, storage bucket, M1/M2 function
 
 - **M1 — proof. ✅ Included.** Capture a photo on completion, upload to the `task-proofs` bucket, and complete through the `complete_task` RPC so a flagged task can't be closed without a timestamped photo. Tick "Require a photo" when adding a task to turn it on.
 - **M2 — recurring. ✅ Included.** The `/recurring` screen creates templates (one-tap presets or custom). `generate_due_tasks()` materialises due tasks — "Run now" for instant testing, or daily via Vercel Cron / pg_cron. A skipped check still reappears the next cycle.
-- **M3 — intake + export.** Public `/report` form for staff, a daily digest email, and the date-range "inspection-ready" export.
+- **M3 — intake + export. ✅ Included.** The `/export` screen builds an inspection-ready record for any date range (every completed check with its time, who did it, the note, the photo, and who signed it off). The `/report` screen lets any staff member log an issue — with an optional photo of the problem — straight into the maintenance queue. Still optional later: automated invite/digest emails (needs an email provider).
 
 ## Deploy
 

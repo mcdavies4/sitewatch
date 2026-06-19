@@ -21,16 +21,17 @@ async function getContext() {
 export async function createSite(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   if (!name) return;
-  const { supabase, user } = await getContext();
+  const { supabase } = await getContext();
+  const { error } = await supabase.rpc("create_site", { p_name: name });
+  if (error) throw new Error(error.message);
+  revalidatePath("/tasks");
+}
 
-  const { data: site, error } = await supabase
-    .from("sites")
-    .insert({ name })
-    .select("id")
-    .single();
-  if (error || !site) return;
-
-  await supabase.from("profiles").update({ site_id: site.id }).eq("id", user.id);
+export async function acceptInvite(formData: FormData) {
+  const id = String(formData.get("id"));
+  const { supabase } = await getContext();
+  const { error } = await supabase.rpc("accept_invite", { p_invite_id: id });
+  if (error) throw new Error(error.message);
   revalidatePath("/tasks");
 }
 
@@ -66,11 +67,15 @@ export async function startTask(formData: FormData) {
 
 export async function completeTask(formData: FormData) {
   const id = String(formData.get("id"));
+  const note = String(formData.get("note") || "").trim() || null;
   const { supabase } = await getContext();
   // Goes through the DB guard: a task flagged requires_photo will be rejected
   // here unless a proof row already exists for it.
   const { error } = await supabase.rpc("complete_task", { p_task_id: id });
   if (error) throw new Error(error.message);
+  if (note) {
+    await supabase.from("tasks").update({ completion_note: note }).eq("id", id);
+  }
   revalidatePath("/tasks");
 }
 
@@ -78,6 +83,7 @@ export async function completeWithProof(formData: FormData) {
   const id = String(formData.get("id"));
   const path = String(formData.get("path"));
   const sha = String(formData.get("sha") || "") || null;
+  const note = String(formData.get("note") || "").trim() || null;
   const { supabase, user } = await getContext();
 
   const { error: proofErr } = await supabase.from("task_proofs").insert({
@@ -85,11 +91,22 @@ export async function completeWithProof(formData: FormData) {
     storage_path: path,
     uploaded_by: user.id,
     image_sha256: sha,
+    note,
   });
   if (proofErr) throw new Error(proofErr.message);
 
   const { error } = await supabase.rpc("complete_task", { p_task_id: id });
   if (error) throw new Error(error.message);
+  if (note) {
+    await supabase.from("tasks").update({ completion_note: note }).eq("id", id);
+  }
+  revalidatePath("/tasks");
+}
+
+export async function deleteTask(formData: FormData) {
+  const id = String(formData.get("id"));
+  const { supabase } = await getContext();
+  await supabase.from("tasks").delete().eq("id", id);
   revalidatePath("/tasks");
 }
 

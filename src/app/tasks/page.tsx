@@ -2,9 +2,10 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { todayISO, isOverdue } from "@/lib/dates";
-import SetupSite from "./SetupSite";
+import Onboarding from "./Onboarding";
 import AddTaskForm from "./AddTaskForm";
 import TaskCard from "./TaskCard";
+import SessionRefresher from "./SessionRefresher";
 import { signOut } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -31,17 +32,28 @@ export default async function TasksPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, full_name, site_id")
+    .select("id, full_name, site_id, role")
     .eq("id", user.id)
     .single();
 
-  if (!profile?.site_id) return <SetupSite />;
+  if (!profile?.site_id) {
+    const { data: invites } = await supabase
+      .from("invites")
+      .select("id, role, sites(name)")
+      .eq("status", "pending")
+      .ilike("email", user.email ?? "");
+    return <Onboarding invites={(invites as never) ?? []} />;
+  }
 
   const { data: site } = await supabase
     .from("sites")
     .select("name")
     .eq("id", profile.site_id)
     .single();
+
+  const role = profile.role ?? "maintenance";
+  const canOperate = ["admin", "manager", "maintenance"].includes(role);
+  const canManage = ["admin", "manager"].includes(role);
 
   const view = (
     ["today", "overdue", "open", "done"].includes(searchParams.view ?? "")
@@ -53,11 +65,20 @@ export default async function TasksPage({
   const { data: openTasks } = await supabase
     .from("tasks")
     .select(
-      "id, title, description, category, source, priority, status, due_date, reported_by_name, requires_photo"
+      "id, title, description, category, source, priority, status, due_date, reported_by_name, requires_photo, completion_note, verified_at, report_photo_path"
     )
     .eq("site_id", profile.site_id)
     .in("status", ["open", "in_progress"])
     .order("due_date", { ascending: true, nullsFirst: false });
+
+  // Count completed in the last 7 days for the summary strip.
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+  const { count: doneThisWeek } = await supabase
+    .from("tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("site_id", profile.site_id)
+    .eq("status", "completed")
+    .gte("completed_at", weekAgo);
 
   const all = openTasks ?? [];
   const today = todayISO();
@@ -70,11 +91,35 @@ export default async function TasksPage({
   else if (view === "open") list = all;
 
   let proofMap: Record<string, string> = {};
+  const reportPhotoMap: Record<string, string> = {};
+
+  if (view !== "done") {
+    const rp = list.filter(
+      (t) => (t as { report_photo_path?: string }).report_photo_path
+    );
+    if (rp.length) {
+      const paths = rp.map(
+        (t) => (t as { report_photo_path: string }).report_photo_path
+      );
+      const { data: signed } = await supabase.storage
+        .from("task-proofs")
+        .createSignedUrls(paths, 3600);
+      const byPath: Record<string, string> = {};
+      (signed ?? []).forEach((s) => {
+        if (s.path && s.signedUrl) byPath[s.path] = s.signedUrl;
+      });
+      rp.forEach((t) => {
+        const p = (t as { report_photo_path: string }).report_photo_path;
+        if (byPath[p]) reportPhotoMap[t.id] = byPath[p];
+      });
+    }
+  }
+
   if (view === "done") {
     const { data: doneTasks } = await supabase
       .from("tasks")
       .select(
-        "id, title, description, category, source, priority, status, due_date, reported_by_name, requires_photo"
+        "id, title, description, category, source, priority, status, due_date, reported_by_name, requires_photo, completion_note, verified_at, report_photo_path"
       )
       .eq("site_id", profile.site_id)
       .eq("status", "completed")
@@ -108,6 +153,7 @@ export default async function TasksPage({
 
   return (
     <main className="mx-auto max-w-md px-4 pb-16 pt-5">
+      <SessionRefresher />
       <header className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-brand">
@@ -128,15 +174,65 @@ export default async function TasksPage({
             <p className="text-xs text-neutral">{profile.full_name}</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Link href="/recurring" className="text-sm text-brand">
-            Recurring
+        <div className="flex max-w-[60%] flex-wrap items-center justify-end gap-x-3 gap-y-1">
+          <Link href="/report" className="text-sm text-brand">
+            Report
           </Link>
+          {canOperate && (
+            <Link href="/recurring" className="text-sm text-brand">
+              Recurring
+            </Link>
+          )}
+          {canOperate && (
+            <Link href="/export" className="text-sm text-brand">
+              Export
+            </Link>
+          )}
+          {canOperate && (
+            <Link href="/callouts" className="text-sm text-brand">
+              Call-outs
+            </Link>
+          )}
+          {canManage && (
+            <Link href="/dashboard" className="text-sm text-brand">
+              Manage
+            </Link>
+          )}
+          {canManage && (
+            <Link href="/team" className="text-sm text-brand">
+              Team
+            </Link>
+          )}
           <form action={signOut}>
             <button className="text-sm text-neutral">Sign out</button>
           </form>
         </div>
       </header>
+
+      <div className="mb-3 grid grid-cols-3 gap-2">
+        <div className="rounded-xl border border-line bg-card px-3 py-2.5 text-center">
+          <p className="font-display text-xl font-bold tabular">
+            {dueToday.length}
+          </p>
+          <p className="text-xs text-neutral">Due today</p>
+        </div>
+        <div className="rounded-xl border border-line bg-card px-3 py-2.5 text-center">
+          <p
+            className={`font-display text-xl font-bold tabular ${
+              overdue.length > 0 ? "text-overdue" : ""
+            }`}
+          >
+            {overdue.length}
+          </p>
+          <p className="text-xs text-neutral">Overdue</p>
+        </div>
+        <div className="rounded-xl border border-line bg-card px-3 py-2.5 text-center">
+          <p className="font-display text-xl font-bold tabular text-done">
+            {doneThisWeek ?? 0}
+          </p>
+          <p className="text-xs text-neutral">Done / 7d</p>
+        </div>
+      </div>
 
       {overdue.length > 0 && view !== "overdue" && (
         <Link
@@ -202,7 +298,12 @@ export default async function TasksPage({
       ) : (
         <div className="space-y-2">
           {list.map((t) => (
-            <TaskCard key={t.id} task={t} proofUrl={proofMap[t.id]} />
+            <TaskCard
+              key={t.id}
+              task={t}
+              proofUrl={proofMap[t.id]}
+              reportPhotoUrl={reportPhotoMap[t.id]}
+            />
           ))}
         </div>
       )}
