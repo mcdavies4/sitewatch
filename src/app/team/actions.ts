@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { sendEmail, inviteEmail } from "@/lib/email";
 
 async function getCtx() {
   const supabase = createClient();
@@ -36,6 +37,22 @@ export async function createInvite(formData: FormData) {
     role,
     invited_by: user.id,
   });
+
+  // Email the invite (no-op if email isn't configured yet)
+  const { data: site } = await supabase
+    .from("sites")
+    .select("name")
+    .eq("id", profile.site_id)
+    .single();
+  const appUrl = process.env.APP_URL || "";
+  if (appUrl) {
+    await sendEmail({
+      to: email,
+      subject: `You've been invited to ${site?.name ?? "a site"} on Sitewatch`,
+      html: inviteEmail(site?.name ?? "a site", role, appUrl, email),
+    });
+  }
+
   revalidatePath("/team");
 }
 

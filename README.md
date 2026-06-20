@@ -8,7 +8,7 @@ One task inbox, four views (Today / Overdue / All open / Done), manual add, one-
 
 At [supabase.com](https://supabase.com), create a project. Then in **SQL Editor**, paste and run the whole of `supabase/migrations/0001_init.sql`. That builds every table, the row-level-security policies, the signup trigger, and the `task-proofs` storage bucket for photo proof — all in one run.
 
-> **Already running an earlier version?** Run any migration files you haven't yet — `0002` through `0006` — once each, in order. `0004` adds invites/roles, `0005` the report photo, `0006` the contractor fields. The rest is in the app code.
+> **Already running an earlier version?** Run any migration files you haven't yet — `0002` through `0007` — once each, in order. `0007` stores email on profiles so digests can be sent. The rest is in the app code.
 
 In **Authentication → Providers → Email**, make sure Email is enabled (magic links are on by default).
 
@@ -53,6 +53,16 @@ supabase/migrations    full schema, RLS, trigger, storage bucket, M1/M2 function
 - **M1 — proof. ✅ Included.** Capture a photo on completion, upload to the `task-proofs` bucket, and complete through the `complete_task` RPC so a flagged task can't be closed without a timestamped photo. Tick "Require a photo" when adding a task to turn it on.
 - **M2 — recurring. ✅ Included.** The `/recurring` screen creates templates (one-tap presets or custom). `generate_due_tasks()` materialises due tasks — "Run now" for instant testing, or daily via Vercel Cron / pg_cron. A skipped check still reappears the next cycle.
 - **M3 — intake + export. ✅ Included.** The `/export` screen builds an inspection-ready record for any date range (every completed check with its time, who did it, the note, the photo, and who signed it off). The `/report` screen lets any staff member log an issue — with an optional photo of the problem — straight into the maintenance queue. Still optional later: automated invite/digest emails (needs an email provider).
+
+## Email (optional)
+
+Invites and a daily digest send automatically once email is configured — until then everything works, just silently (no emails).
+
+1. Create a free account at [resend.com](https://resend.com) and make an API key.
+2. To send to real addresses, verify a domain in Resend and set `RESEND_FROM` to an address on it (e.g. `Sitewatch <noreply@yourdomain.com>`). For quick testing, leave the default `onboarding@resend.dev`, which only delivers to your own Resend account email.
+3. In Vercel → Settings → Environment Variables, add: `RESEND_API_KEY`, `RESEND_FROM`, `APP_URL` (your deployed URL, no trailing slash), and `SUPABASE_SERVICE_ROLE_KEY` (Supabase → Settings → API — server-only, never expose it).
+
+The digest runs daily at 07:00 via `vercel.json` and emails each site's admins/managers/maintenance a summary of overdue checks and call-outs to chase (it skips sites with nothing due). Invites email the moment you add someone on the Team screen.
 
 ## Deploy
 
