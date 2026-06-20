@@ -3,7 +3,11 @@
 import { useRef, useState } from "react";
 import { createCallout } from "./actions";
 
-export default function NewCallout() {
+export default function NewCallout({
+  contractors,
+}: {
+  contractors: { id: string; full_name: string }[];
+}) {
   const [open, setOpen] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -57,6 +61,23 @@ export default function NewCallout() {
           className="mt-1 w-full rounded-lg border border-line px-3 py-2.5 text-sm bg-white tabular"
         />
       </label>
+      {contractors.length > 0 && (
+        <label className="block text-sm text-neutral">
+          Assign to a contractor account (optional — they get an email)
+          <select
+            name="assigned_to"
+            defaultValue=""
+            className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2.5 text-sm"
+          >
+            <option value="">Not assigned</option>
+            {contractors.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.full_name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <textarea
         name="details"
         rows={2}

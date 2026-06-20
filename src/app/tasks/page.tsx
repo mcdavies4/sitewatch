@@ -5,6 +5,7 @@ import { todayISO, isOverdue } from "@/lib/dates";
 import Onboarding from "./Onboarding";
 import AddTaskForm from "./AddTaskForm";
 import TaskCard from "./TaskCard";
+import ContractorJobCard from "./ContractorJobCard";
 import SessionRefresher from "./SessionRefresher";
 import { signOut } from "./actions";
 
@@ -60,12 +61,17 @@ export default async function TasksPage({
     const { data: mine } = await supabase
       .from("tasks")
       .select(
-        "id, title, description, category, source, priority, status, due_date, reported_by_name, requires_photo, completion_note, verified_at, report_photo_path"
+        "id, title, description, category, source, priority, status, due_date, reported_by_name, requires_photo, completion_note, verified_at, report_photo_path, assigned_to, created_by, contractor_name, contractor_contact"
       )
       .eq("site_id", profile.site_id)
       .order("created_at", { ascending: false })
       .limit(50);
     const items = mine ?? [];
+    const jobs = items.filter((t) => t.assigned_to === user.id);
+    const reports = items.filter(
+      (t) => t.created_by === user.id && t.assigned_to !== user.id
+    );
+    const isContractor = role === "contractor";
 
     return (
       <main className="mx-auto max-w-md px-4 pb-16 pt-5">
@@ -80,27 +86,53 @@ export default async function TasksPage({
           </form>
         </header>
 
-        <Link
-          href="/report"
-          className="mb-5 block rounded-xl bg-brand px-4 py-3 text-center font-medium text-white"
-        >
-          Report an issue
-        </Link>
+        {!isContractor && (
+          <Link
+            href="/report"
+            className="mb-5 block rounded-xl bg-brand px-4 py-3 text-center font-medium text-white"
+          >
+            Report an issue
+          </Link>
+        )}
 
-        <h2 className="mb-2 text-sm font-semibold">Your reports</h2>
-        {items.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-line bg-card px-4 py-10 text-center">
-            <p className="font-medium">Nothing yet</p>
-            <p className="mt-1 text-sm text-neutral">
-              Anything you report will show here so you can track it.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {items.map((t) => (
-              <TaskCard key={t.id} task={t} canAct={false} />
-            ))}
-          </div>
+        {isContractor && (
+          <section className="mb-6">
+            <h2 className="mb-2 text-sm font-semibold">Your jobs</h2>
+            {jobs.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-line bg-card px-4 py-10 text-center">
+                <p className="font-medium">No jobs assigned</p>
+                <p className="mt-1 text-sm text-neutral">
+                  Call-outs assigned to you will show here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {jobs.map((t) => (
+                  <ContractorJobCard key={t.id} job={t} />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {!isContractor && (
+          <>
+            <h2 className="mb-2 text-sm font-semibold">Your reports</h2>
+            {reports.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-line bg-card px-4 py-10 text-center">
+                <p className="font-medium">Nothing yet</p>
+                <p className="mt-1 text-sm text-neutral">
+                  Anything you report will show here so you can track it.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {reports.map((t) => (
+                  <TaskCard key={t.id} task={t} canAct={false} />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </main>
     );

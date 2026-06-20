@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { formatDue, isOverdue } from "@/lib/dates";
 import NewCallout from "./NewCallout";
+import AssignControl from "./AssignControl";
 import { setCalloutStatus, deleteCallout } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,7 @@ type Callout = {
   due_date: string | null;
   contractor_name: string | null;
   contractor_contact: string | null;
+  assigned_to: string | null;
 };
 
 function contactHref(contact: string): string {
@@ -23,7 +25,15 @@ function contactHref(contact: string): string {
     : `tel:${contact.replace(/\s+/g, "")}`;
 }
 
-function CalloutCard({ c }: { c: Callout }) {
+function CalloutCard({
+  c,
+  contractors,
+  assignedName,
+}: {
+  c: Callout;
+  contractors: { id: string; full_name: string }[];
+  assignedName: string | null;
+}) {
   const done = c.status === "completed";
   const chase = !done && isOverdue(c.due_date);
   return (
@@ -71,6 +81,15 @@ function CalloutCard({ c }: { c: Callout }) {
         {c.description && (
           <p className="mt-1 text-sm text-neutral">{c.description}</p>
         )}
+
+        <div className="mt-2">
+          <AssignControl
+            calloutId={c.id}
+            assignedTo={c.assigned_to}
+            assignedName={assignedName}
+            contractors={contractors}
+          />
+        </div>
 
         <div className="mt-2.5 flex justify-end gap-1.5">
           {done ? (
@@ -132,7 +151,7 @@ export default async function CalloutsPage() {
   const { data: open } = await supabase
     .from("tasks")
     .select(
-      "id, title, description, status, due_date, contractor_name, contractor_contact"
+      "id, title, description, status, due_date, contractor_name, contractor_contact, assigned_to"
     )
     .eq("site_id", profile.site_id)
     .eq("source", "contractor_callout")
@@ -142,13 +161,24 @@ export default async function CalloutsPage() {
   const { data: done } = await supabase
     .from("tasks")
     .select(
-      "id, title, description, status, due_date, contractor_name, contractor_contact"
+      "id, title, description, status, due_date, contractor_name, contractor_contact, assigned_to"
     )
     .eq("site_id", profile.site_id)
     .eq("source", "contractor_callout")
     .eq("status", "completed")
     .order("completed_at", { ascending: false })
     .limit(15);
+
+  // Contractor accounts on this site, for assignment
+  const { data: contractorRows } = await supabase
+    .from("profiles")
+    .select("id, full_name")
+    .eq("site_id", profile.site_id)
+    .eq("role", "contractor")
+    .order("full_name", { ascending: true });
+  const contractors = contractorRows ?? [];
+  const nameById: Record<string, string> = {};
+  contractors.forEach((c) => (nameById[c.id] = c.full_name));
 
   const active = open ?? [];
   const chasing = active.filter((c) => isOverdue(c.due_date));
@@ -168,7 +198,7 @@ export default async function CalloutsPage() {
       </header>
 
       <div className="mb-4">
-        <NewCallout />
+        <NewCallout contractors={contractors} />
       </div>
 
       {chasing.length > 0 && (
@@ -178,7 +208,7 @@ export default async function CalloutsPage() {
           </h2>
           <div className="space-y-2">
             {chasing.map((c) => (
-              <CalloutCard key={c.id} c={c} />
+              <CalloutCard key={c.id} c={c} contractors={contractors} assignedName={c.assigned_to ? nameById[c.assigned_to] ?? null : null} />
             ))}
           </div>
         </section>
@@ -193,7 +223,7 @@ export default async function CalloutsPage() {
         ) : (
           <div className="space-y-2">
             {waiting.map((c) => (
-              <CalloutCard key={c.id} c={c} />
+              <CalloutCard key={c.id} c={c} contractors={contractors} assignedName={c.assigned_to ? nameById[c.assigned_to] ?? null : null} />
             ))}
           </div>
         )}
@@ -204,7 +234,7 @@ export default async function CalloutsPage() {
           <h2 className="mb-2 text-sm font-semibold">Recently completed</h2>
           <div className="space-y-2">
             {completed.map((c) => (
-              <CalloutCard key={c.id} c={c} />
+              <CalloutCard key={c.id} c={c} contractors={contractors} assignedName={c.assigned_to ? nameById[c.assigned_to] ?? null : null} />
             ))}
           </div>
         </section>

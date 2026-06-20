@@ -8,7 +8,7 @@ One task inbox, four views (Today / Overdue / All open / Done), manual add, one-
 
 At [supabase.com](https://supabase.com), create a project. Then in **SQL Editor**, paste and run the whole of `supabase/migrations/0001_init.sql`. That builds every table, the row-level-security policies, the signup trigger, and the `task-proofs` storage bucket for photo proof — all in one run.
 
-> **Already running an earlier version?** Run any migration files you haven't yet — `0002` through `0008` — once each, in order. `0008` fixes task visibility so limited roles (care staff / contractor) only see their own items, not the whole site's. The rest is in the app code.
+> **Already running an earlier version?** Run any migration files you haven't yet — `0002` through `0009` — once each, in order. `0009` lets an assigned contractor update their own job's status. The rest is in the app code.
 
 In **Authentication → Providers → Email**, make sure Email is enabled (magic links are on by default).
 

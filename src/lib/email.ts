@@ -64,6 +64,22 @@ export function inviteEmail(siteName: string, role: string, appUrl: string, emai
   `);
 }
 
+export function jobAssignedEmail(
+  siteName: string,
+  title: string,
+  appUrl: string,
+  expected?: string | null
+) {
+  return SHELL(`
+    <p style="margin:0 0 14px;font-size:18px;font-weight:700;font-family:system-ui;">New job at ${siteName}</p>
+    <p style="margin:0 0 8px;">You've been assigned:</p>
+    <p style="margin:0 0 18px;font-weight:600;">${title.replace(/</g, "&lt;")}</p>
+    ${expected ? `<p style="margin:0 0 18px;">Expected by: <strong>${expected}</strong></p>` : ""}
+    <p style="margin:0 0 22px;">${BTN(`${appUrl}/tasks`, "View the job")}</p>
+    <p style="margin:0;color:#5B6B68;font-size:13px;">Sign in with this email to see it and update its status.</p>
+  `);
+}
+
 export function digestEmail(
   siteName: string,
   appUrl: string,
