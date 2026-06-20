@@ -44,10 +44,12 @@ export default function TaskCard({
   task,
   proofUrl,
   reportPhotoUrl,
+  canAct = true,
 }: {
   task: Task;
   proofUrl?: string;
   reportPhotoUrl?: string;
+  canAct?: boolean;
 }) {
   const done = task.status === "completed";
   const overdue = !done && isOverdue(task.due_date);
@@ -152,13 +154,15 @@ export default function TaskCard({
           </div>
         </div>
 
-        <div className="mt-2">
-          <TaskActions
-            taskId={task.id}
-            status={task.status}
-            requiresPhoto={task.requires_photo}
-          />
-        </div>
+        {canAct && (
+          <div className="mt-2">
+            <TaskActions
+              taskId={task.id}
+              status={task.status}
+              requiresPhoto={task.requires_photo}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

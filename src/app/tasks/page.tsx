@@ -55,6 +55,57 @@ export default async function TasksPage({
   const canOperate = ["admin", "manager", "maintenance"].includes(role);
   const canManage = ["admin", "manager"].includes(role);
 
+  // Limited roles (care staff / contractor) only see their own items.
+  if (!canOperate) {
+    const { data: mine } = await supabase
+      .from("tasks")
+      .select(
+        "id, title, description, category, source, priority, status, due_date, reported_by_name, requires_photo, completion_note, verified_at, report_photo_path"
+      )
+      .eq("site_id", profile.site_id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    const items = mine ?? [];
+
+    return (
+      <main className="mx-auto max-w-md px-4 pb-16 pt-5">
+        <SessionRefresher />
+        <header className="mb-4 flex items-center justify-between">
+          <div>
+            <p className="font-display text-base font-bold">{site?.name}</p>
+            <p className="text-xs text-neutral">{profile.full_name}</p>
+          </div>
+          <form action={signOut}>
+            <button className="text-sm text-neutral">Sign out</button>
+          </form>
+        </header>
+
+        <Link
+          href="/report"
+          className="mb-5 block rounded-xl bg-brand px-4 py-3 text-center font-medium text-white"
+        >
+          Report an issue
+        </Link>
+
+        <h2 className="mb-2 text-sm font-semibold">Your reports</h2>
+        {items.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-line bg-card px-4 py-10 text-center">
+            <p className="font-medium">Nothing yet</p>
+            <p className="mt-1 text-sm text-neutral">
+              Anything you report will show here so you can track it.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {items.map((t) => (
+              <TaskCard key={t.id} task={t} canAct={false} />
+            ))}
+          </div>
+        )}
+      </main>
+    );
+  }
+
   const view = (
     ["today", "overdue", "open", "done"].includes(searchParams.view ?? "")
       ? searchParams.view
